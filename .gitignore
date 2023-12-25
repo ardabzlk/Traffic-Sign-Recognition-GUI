@@ -1,0 +1,7 @@
+# add venv folder to gitingore
+venv/
+Train/
+Test/
+Meta/
+*.csv
+custom_images_to_test/
