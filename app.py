@@ -1,18 +1,12 @@
 import tkinter as tk
-from tkinter import filedialog
 from tkinter import *
-from PIL import ImageTk, Image
-import numpy as np
+from PIL import Image, ImageTk
 import cv2
+import numpy as np
 from keras.models import load_model
 
 # Load the pre-trained traffic sign recognition model
-# Model is trained on German Traffic Sign Dataset 
-# https://www.kaggle.com/meowmeowmeowmeowmeow/gtsrb-german-traffic-sign
-model = load_model('traffic_classifier.h5') 
-
-# Define traffic sign classes
-# classes are in the order of the labels in the dataset 
+model = load_model('traffic_classifier.h5')
 
 # classes from 0 to 42
 classes = { 0:'Speed limit (20km/h)',
@@ -60,83 +54,76 @@ classes = { 0:'Speed limit (20km/h)',
             42:'End no passing veh > 3.5 tons' }
 
 
-# Define a function to classify the traffic signs
-def classify_traffic_sign(file_path):
-    '''
-    This function takes the file path of the traffic sign image as input
-    and predicts the traffic sign class.
-    
-    Parameters
-    ----------
-    file_path : str
-        File path of the traffic sign image.
-    
-    Returns
-    -------
-    None. 
-    '''
+# Function to classify traffic signs in a frame
+def classify_traffic_sign(frame):
     try:
-        image = cv2.imread(file_path)
-        image = cv2.resize(image, (30, 30))
-        image = np.expand_dims(image, axis=0)
-        image = image / 255.0  # Normalize pixel values
+        resized_frame = cv2.resize(frame, (30, 30))
+        processed_frame = np.expand_dims(resized_frame, axis=0)
+        processed_frame = processed_frame / 255.0  # Normalize pixel values
 
         # Perform traffic sign classification
-        pred = model.predict(image)
+        pred = model.predict(processed_frame)
         predicted_class = np.argmax(pred)
         sign = classes[predicted_class]
 
-        # Update the label with the predicted traffic sign
-        label.configure(text=f"Predicted Traffic Sign: {sign}")
+        return sign
     except Exception as e:
         print(f"Error: {e}")
-        label.configure(text="Error: Unable to classify the traffic sign.")
+        return "Error: Unable to classify the traffic sign."
 
-def upload_image():
-    '''
-    This function opens a file dialog box to upload the traffic sign image.
+# Function to start real-time traffic sign detection
+def start_detection():
+    def update_frame():
+        ret, frame = cap.read()
+        if ret:
+            # frame = cv2.flip(frame, 1)  # Mirror the frame
+            sign = classify_traffic_sign(frame)
 
-    Parameters
-    ----------
-    None.
+            # Display the frame with the predicted sign
+            cv2.putText(frame, f"{sign}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-    Returns
-    -------
-    None.
-    '''
-    try:
-        file_path = filedialog.askopenfilename()
-        uploaded = Image.open(file_path)
-        uploaded.thumbnail(((top.winfo_width() / 2.25), (top.winfo_height() / 2.25)))
-        im = ImageTk.PhotoImage(uploaded)
+            # Resize frame to fit the window
+            frame = cv2.resize(frame, (800, 600))
 
-        sign_image.configure(image=im)
-        sign_image.image = im
-        label.configure(text='')
-        classify_traffic_sign(file_path)
-    except Exception as e:
-        print(f"Error: {e}")
-        label.configure(text="Error: Unable to upload image.")
+            # Convert frame to RGB and then to ImageTk format
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img = Image.fromarray(frame_rgb)
+            img_tk = ImageTk.PhotoImage(image=img)
+
+            # Update the label with the new frame
+            video_label.img_tk = img_tk  # Keep reference to avoid garbage collection
+            video_label.configure(image=img_tk)
+        
+        # Repeat after 15 milliseconds (change delay as needed)
+        video_label.after(15, update_frame)
+
+    cap = cv2.VideoCapture(0)  # Open the webcam (change the index if using an external camera)
+    if not cap.isOpened():
+        print("Error: Unable to access the webcam")
+        return
+
+    top = tk.Toplevel()
+    top.geometry('800x600')
+    top.title('Traffic Sign Detection')
+
+    video_label = Label(top)
+    video_label.pack()
+
+    # Start updating the frame
+    update_frame()
 
 # Create a GUI window
+root = tk.Tk()
+root.geometry('800x600')
+root.title('Real-time Traffic Sign Recognition')
 
+start_button = Button(root, text="Start Detection", command=start_detection, padx=10, pady=5)
+start_button.pack(side=BOTTOM, pady=50)
 
-
-top = tk.Tk()
-top.geometry('800x600')
-top.title('Traffic Sign Recognition')
-
-# Create GUI components
-upload_button = Button(top, text="Upload Image", command=upload_image, padx=10, pady=5)
-upload_button.pack(side=BOTTOM, pady=50)
-
-sign_image = Label(top)
-sign_image.pack(side=BOTTOM, expand=True)
-
-label = Label(top, font=('Arial', 16))
+label = Label(root, font=('Arial', 16))
 label.pack(side=BOTTOM, expand=True)
 
-heading = Label(top, text="Traffic Sign Recognition", pady=20, font=('Arial', 20))
+heading = Label(root, text="Real-time Traffic Sign Recognition", pady=20, font=('Arial', 20))
 heading.pack()
 
-top.mainloop()
+root.mainloop()
