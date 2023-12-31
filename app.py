@@ -7,8 +7,8 @@ from keras.models import load_model
 
 # Load the pre-trained traffic sign recognition model
 model = load_model('traffic_classifier.h5')
+# model = load_model('my_model.keras')
 
-# classes from 0 to 42
 classes = { 0:'Speed limit (20km/h)',
             1:'Speed limit (30km/h)',
             2:'Speed limit (50km/h)',
